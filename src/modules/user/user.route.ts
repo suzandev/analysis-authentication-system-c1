@@ -4,60 +4,20 @@ import config from "../../config";
 import { jwtUtils } from "../../utils/jwt";
 import { Role } from "../../../generated/prisma/enums";
 import HttpStatus from "http-status";
+import { catchAsync } from "../../utils/catchAsync";
+import { JwtPayload } from "jsonwebtoken";
+import { prisma } from "../../lib/prisma";
+import { auth } from "../../middlewares/auth";
 
 const router = Router();
 
-declare global {
-  namespace Express {
-    interface Request {
-      user?: {
-        email: string;
-        name: string;
-        id: string;
-        role: Role;
-      };
-    }
-  }
-}
-
 router.post("/register", userController.registerUser);
+
+auth(Role.ADMIN, Role.USER, Role.AUTHOR);
 
 router.get(
   "/me",
-  (req: Request, res: Response, next: NextFunction) => {
-    const { accessToken } = req.cookies;
-
-    const verifiedToken = jwtUtils.verifyToken(
-      accessToken,
-      config.jwt_access_secret,
-    );
-
-    if (typeof verifiedToken === "string") {
-      throw new Error(verifiedToken);
-    }
-
-    const { email, name, id, role } = verifiedToken;
-
-    const requiredRoles = [Role.ADMIN, Role.USER, Role.AUTHOR];
-
-    if (!requiredRoles.includes(role)) {
-      return res.status(403).json({
-        success: false,
-        statusCode: HttpStatus.FORBIDDEN,
-        message:
-          "Forbidden. You don't have permission to access this resource.",
-      });
-    }
-
-    req.user = {
-      email,
-      name,
-      id,
-      role,
-    };
-
-    next();
-  },
+  auth(Role.ADMIN, Role.USER, Role.AUTHOR),
   userController.getMyProfile,
 );
 
